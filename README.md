@@ -1,16 +1,25 @@
-# Jandy RS-485 Autonomous API
+# Jandy RS-485 Controller & Web App
 
-A fully autonomous, thread-safe Python library for controlling Jandy / Pentair Aqualink pool and spa systems via the RS-485 bus. 
+![Jandy Web App Dashboard](screenshot.jpg)
 
-Instead of relying on web interfaces or complex system spoofing, this library works by **spoofing a Jandy PDA Handheld Remote (`0x60`)**. It establishes a background thread to maintain active communication with the Master Controller, parsing the screen buffer and cursor position in real-time to enable highly intelligent, state-aware automation.
+A Python library and web dashboard for controlling Jandy / Pentair Aqualink pool and spa systems over RS-485. 
+
+The system works by spoofing a Jandy PDA Handheld Remote (`0x60`). It runs a background thread that communicates with the Master Controller, reading the screen buffer and cursor position to keep track of menu states and equipment status.
 
 ## Features
 
-- **Non-Blocking Status Polling:** Extracts real-time Water Temperature and Heater Setpoints directly from RS-485 `CMD_JXI_PING` broadcasts without ever needing to look at the screen.
-- **Opportunistic Screen Scraping:** Silently reads equipment statuses (Pool Mode, Spa Mode, Air Temp) from the Home Screen buffer as it updates.
-- **State-Aware Navigation:** Tracks the Master Controller's internal menu cursor. If an item is already ON, the API will not accidentally turn it OFF.
-- **High-Speed Bidirectional Scrolling:** Understands that Jandy menus wrap around. If an item is at the bottom of the menu (like `ALL OFF`), the API will scroll `UP` to instantly wrap around instead of pressing `DOWN` 15 times.
-- **Safety Interlocks:** Automatically aborts actions if the system is in a transitional "Cool Down" state (`***`). 
+### Web App
+- **Mobile UI:** Clean, responsive interface designed for phones.
+- **PWA Support:** Can be added to your home screen to run in full-screen mode like a native app.
+- **Hardware Sync:** The UI automatically updates to match the physical equipment state (e.g., if someone turns on the spa using the physical remote outside, the web app updates).
+- **Configurable:** Uses `config.yaml` to hide or show buttons depending on your specific pool setup.
+
+### Python API
+- **Status Polling:** Parses `CMD_JXI_PING` broadcasts to get real-time water temps and heater setpoints without navigating menus.
+- **Screen Scraping:** Reads equipment status (Pool Mode, Spa Mode, etc.) directly from the screen buffer in the background.
+- **State Tracking:** Keeps track of the menu cursor and equipment state so it won't accidentally toggle something off if it's already on.
+- **Menu Wrapping:** Scrolls UP to reach items at the bottom of the menu (like `ALL OFF`) instead of pressing DOWN 15 times.
+- **Safety Interlocks:** Aborts commands if the Jandy system is in a transitional state (`***`), and prevents heaters from turning on if the main pump is off.
 
 ## Hardware Requirements
 
