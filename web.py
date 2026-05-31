@@ -15,12 +15,14 @@ try:
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
         serial_port = config.get("system", {}).get("serial_port", "/dev/ttyUSB0")
+        enable_logging = config.get("system", {}).get("enable_logging", False)
 except Exception as e:
     print(f"[WEB] Failed to load config.yaml, defaulting to /dev/ttyUSB0. Error: {e}")
     serial_port = "/dev/ttyUSB0"
+    enable_logging = False
 
 # --- API & Queue Initialization ---
-api = JandyController(port=serial_port, spoof_id=0x60, enable_logging=True, config_path="config.yaml")
+api = JandyController(port=serial_port, spoof_id=0x60, enable_logging=enable_logging, config_path="config.yaml")
 
 command_queue = queue.Queue()
 

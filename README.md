@@ -52,6 +52,7 @@ Open `config.yaml` to specify your serial port connection and toggle the hardwar
 ```yaml
 system:
   serial_port: "/dev/ttyUSB0"
+  enable_logging: false
 
 hardware:
   has_spa: true
