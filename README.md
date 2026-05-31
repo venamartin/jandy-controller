@@ -21,42 +21,39 @@ Instead of relying on web interfaces or complex system spoofing, this library wo
 ## Quickstart
 
 ### Installation
-Ensure you have `pyserial` installed:
+
+This project uses [uv](https://github.com/astral-sh/uv), an extremely fast Python package manager.
+
+1. **Install `uv`**:
 ```bash
-uv pip install pyserial
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Usage Example
-```python
-import time
-import pprint
-from jandy import JandyController
+2. **Clone and Run**:
+The system includes a fully mobile-responsive Progressive Web App (PWA) dashboard. To run it continuously in the background, we recommend using `screen` or `tmux`.
 
-# Initialize the API (Defaults to /dev/ttyUSB0)
-# This instantly spawns a background thread to maintain RS-485 communication
-api = JandyController(port='/dev/ttyUSB0', spoof_id=0x60, enable_logging=False)
+**Using `screen`**:
+```bash
+# Start a new screen session
+screen -S jandy
 
-try:
-    # Get a complete snapshot of the system's current state
-    print("System Status:")
-    pprint.pprint(api.get_status())
+# Run the web server using uv
+uv run uvicorn web:app --host 0.0.0.0 --port 8000
 
-    # Turn on the Spa and set the heater to 98°F
-    api.spa_mode(True)
-    api.spa_heat(True, 98)
+# To detach and leave it running, press: Ctrl+A, then D
+# To reattach later, run: screen -r jandy
+```
 
-    # Turn on the Air Blower and Spa Lights
-    api.air_blower(True)
-    api.spa_lights(True)
+**Using `tmux`**:
+```bash
+# Start a new tmux session
+tmux new -s jandy
 
-    time.sleep(10)
+# Run the web server using uv
+uv run uvicorn web:app --host 0.0.0.0 --port 8000
 
-    # Shut everything down instantly
-    api.all_off()
-
-finally:
-    # Always cleanly stop the background thread
-    api.stop()
+# To detach and leave it running, press: Ctrl+B, then D
+# To reattach later, run: tmux attach -t jandy
 ```
 
 ## Available API Methods
