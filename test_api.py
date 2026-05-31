@@ -3,7 +3,7 @@ import time
 import pprint
 import threading
 
-test = "poollights"
+test = "airblower"
 
 def display_status(api):
     waiting_for_input = [True]
@@ -24,7 +24,7 @@ def display_status(api):
 def main():
     print("Starting Jandy Autonomous API Test...")
     # Logging is enabled here for debugging, but can be set to False for production!
-    api = JandyController(port='/dev/ttyUSB0', spoof_id=0x60, enable_logging=True)
+    api = JandyController(port='/dev/ttyUSB0', spoof_id=0x60, enable_logging=True, config_path="config.yaml")
     
     try:
         if test == "spa":

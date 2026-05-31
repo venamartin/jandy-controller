@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+    <title>Jandy Control System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h1>Jandy Control</h1>
+                <button class="btn-icon" style="width: 30px; height: 30px; font-size: 14px;" onclick="toggleFullScreen()" title="Toggle Fullscreen">⛶</button>
+            </div>
+            <div class="status-indicator">
+                <span class="dot"></span>
+                <span id="connection-status">Connected</span>
+            </div>
+        </header>
+
+        <section class="metrics">
+            <div class="metric-card">
+                <h3>Air Temp</h3>
+                <div class="metric-value" id="air-temp">--°</div>
+            </div>
+            <div class="metric-card">
+                <h3>Water Temp</h3>
+                <div class="metric-value" id="water-temp">--°</div>
+            </div>
+        </section>
+
+        <section class="controls">
+            <h2>System Control</h2>
+            
+            <div class="danger-zone" style="margin-bottom: 15px;">
+                <button class="btn btn-danger" onclick="sendCommand('all_off', false); this.blur();">
+                    ALL OFF
+                </button>
+            </div>
+            
+            <div class="control-grid" id="control-grid">
+                <!-- Buttons will be injected here dynamically by app.js based on hardware config -->
+            </div>
+        </section>
+    </div>
+
+    <!-- Temperature Modal Template (Hidden by default) -->
+    <div id="temp-modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Set Temperature</h3>
+            <div class="temp-selector">
+                <button class="btn-icon" onclick="adjustTemp(-1)">-</button>
+                <span id="modal-temp-value">85</span>°
+                <button class="btn-icon" onclick="adjustTemp(1)">+</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitTemp()">Turn On</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=3"></script>
+</body>
+</html>

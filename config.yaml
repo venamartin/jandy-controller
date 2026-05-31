@@ -1,0 +1,9 @@
+hardware:
+  has_spa: true
+  has_pool_heater: true
+  has_spa_heater: true
+  has_pool_lights: true
+  has_spa_lights: true
+  has_blower: true
+  has_solar: false
+  has_cleaner: true

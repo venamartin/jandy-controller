@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import Dict, Optional, Callable
 
 import re
+import yaml
+import os
 from .protocol import JandyPacket, DLE, STX, BUTTON_CODES, calculate_checksum, CMD_JXI_PING
 
 class JandyController:
@@ -13,13 +15,33 @@ class JandyController:
     A robust, thread-safe controller that spoofs a PDA device on the Jandy RS-485 bus.
     It tracks the Master Controller's screen state to perform intelligent state-aware navigation.
     """
-    def __init__(self, port: str = '/dev/ttyUSB0', spoof_id: int = 0x60, enable_logging: bool = True, log_file_path: str = "api-test.log"):
+    def __init__(self, port: str = '/dev/ttyUSB0', spoof_id: int = 0x60, enable_logging: bool = True, log_file_path: str = "api-test.log", config_path: str = "config.yaml"):
         self.port = port
         self.spoof_id = spoof_id
         self.enable_logging = enable_logging
         self.log_file = None
         if self.enable_logging:
             self.log_file = open(log_file_path, "w")
+            
+        # Hardware Configuration
+        self.config = {
+            "has_spa": True,
+            "has_pool_heater": True,
+            "has_spa_heater": True,
+            "has_pool_lights": True,
+            "has_spa_lights": True,
+            "has_blower": True,
+            "has_solar": True
+        }
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                data = yaml.safe_load(f)
+                if data and "hardware" in data:
+                    self.config.update(data["hardware"])
+            print(f"[API] Loaded configuration from {config_path}")
+        else:
+            print(f"[API] Config file {config_path} not found. Assuming all hardware exists.")
             
         # Serial connection
         self.ser = serial.Serial(port, 9600, timeout=0.1)
@@ -46,7 +68,8 @@ class JandyController:
             "solar_on": None, # Unimplemented
             "blower_on": None, # Unimplemented
             "pool_lights_on": None, # Unimplemented
-            "spa_lights_on": None # Unimplemented
+            "spa_lights_on": None, # Unimplemented
+            "cleaner_on": None
         }
         
         self._button_event = threading.Event()
@@ -146,13 +169,15 @@ class JandyController:
                     elif "SPA HEATER" in text:
                         self.status["spa_heater_on"] = " ON" in text
                     elif "AIR BLOWER" in text:
-                        self.status["blower_on"] = " ON" in text
+                        self.status["blower_on"] = " OFF" not in text and "***" not in text
                     elif "POOL LIGHT" in text:
-                        self.status["pool_lights_on"] = " ON" in text
+                        self.status["pool_lights_on"] = " OFF" not in text and "***" not in text
                     elif "SPA LIGHT" in text:
-                        self.status["spa_lights_on"] = " ON" in text
+                        self.status["spa_lights_on"] = " OFF" not in text and "***" not in text
                     elif "SOLAR HEATER" in text:
-                        self.status["solar_on"] = " ON" in text
+                        self.status["solar_on"] = " OFF" not in text and "***" not in text
+                    elif "CLEANER" in text:
+                        self.status["cleaner_on"] = " OFF" not in text and "***" not in text
         
         # Update Cursor Position
         elif packet.cmd == 0x08 and packet.dest == self.spoof_id:
@@ -334,6 +359,13 @@ class JandyController:
             
         is_on = " ON" in current_text
         
+        # Sync current known state just in case it was missed by the scraper
+        if equip_name == "AIR BLOWER": self.status["blower_on"] = is_on
+        elif equip_name == "POOL LIGHT": self.status["pool_lights_on"] = is_on
+        elif equip_name == "SPA LIGHT": self.status["spa_lights_on"] = is_on
+        elif equip_name == "SOLAR HEATER": self.status["solar_on"] = is_on
+        elif equip_name == "CLEANER": self.status["cleaner_on"] = is_on
+        
         if is_on == desired_state:
             print(f"[API] {equip_name.strip()} is already {'ON' if is_on else 'OFF'}.")
             self.press("BACK")
@@ -341,6 +373,15 @@ class JandyController:
             
         print(f"[API] Toggling {equip_name.strip()} to {'ON' if desired_state else 'OFF'}...")
         self.press("SELECT", 1.0)
+        
+        # Force update the internal state because we are about to press BACK immediately 
+        # and the scraper will miss the updated text!
+        if equip_name == "AIR BLOWER": self.status["blower_on"] = desired_state
+        elif equip_name == "POOL LIGHT": self.status["pool_lights_on"] = desired_state
+        elif equip_name == "SPA LIGHT": self.status["spa_lights_on"] = desired_state
+        elif equip_name == "SOLAR HEATER": self.status["solar_on"] = desired_state
+        elif equip_name == "CLEANER": self.status["cleaner_on"] = desired_state
+        
         self.press("BACK")
         return True
 
@@ -356,31 +397,98 @@ class JandyController:
             return False
         print("[API] Executing ALL OFF...")
         self.press("SELECT", 1.0)
-        self.go_home()
+        
+        # Force update the internal state manually since ALL OFF shuts down everything
+        self.status["pool_mode_on"] = False
+        self.status["spa_mode_on"] = False
+        self.status["pool_heater_on"] = False
+        self.status["spa_heater_on"] = False
+        self.status["blower_on"] = False
+        self.status["pool_lights_on"] = False
+        self.status["spa_lights_on"] = False
+        self.status["solar_on"] = False
+        self.status["cleaner_on"] = False
+        
+        self.press("BACK")
         return True
 
     def air_blower(self, state: bool):
         """Turns the Air Blower on or off."""
+        if not self.config.get("has_blower", True):
+            print("[API] CONFIG LOCKOUT: Air Blower is disabled in config. Aborting.")
+            return False
+            
+        if state:
+            # SAFETY CHECK: Air blower requires Spa to be ON
+            self.go_home()
+            if not self.navigate_to("SPA MODE"):
+                return False
+            if " ON" not in self.get_cursor_text():
+                print("[API] SAFETY LOCKOUT: Cannot turn on Air Blower while Spa Mode is OFF.")
+                return False
+                
         return self._toggle_aux_equipment("AIR BLOWER", state)
 
     def pool_lights(self, state: bool):
         """Turns the Pool Lights on or off."""
+        if not self.config.get("has_pool_lights", True):
+            print("[API] CONFIG LOCKOUT: Pool Lights are disabled in config. Aborting.")
+            return False
         return self._toggle_aux_equipment("POOL LIGHT", state)
 
     def spa_lights(self, state: bool):
         """Turns the Spa Lights on or off."""
+        if not self.config.get("has_spa_lights", True):
+            print("[API] CONFIG LOCKOUT: Spa Lights are disabled in config. Aborting.")
+            return False
         return self._toggle_aux_equipment("SPA LIGHT", state)
 
     def solar(self, state: bool):
         """Turns the Solar Heater on or off."""
+        if not self.config.get("has_solar", True):
+            print("[API] CONFIG LOCKOUT: Solar Heater is disabled in config. Aborting.")
+            return False
         return self._toggle_aux_equipment("SOLAR HEATER", state)
+
+    def cleaner(self, state: bool):
+        """Turns the Cleaner on or off."""
+        if not self.config.get("has_cleaner", True):
+            print("[API] CONFIG LOCKOUT: Cleaner is disabled in config. Aborting.")
+            return False
+            
+        if state:
+            # SAFETY CHECK: Cleaner requires Pool to be ON
+            self.go_home()
+            if not self.navigate_to("POOL MODE"):
+                return False
+            if " ON" not in self.get_cursor_text():
+                print("[API] SAFETY LOCKOUT: Cannot turn on Cleaner while Pool Mode is OFF.")
+                return False
+                
+        return self._toggle_aux_equipment("CLEANER", state)
 
     def pool_mode(self, state: bool):
         """Turns the Pool on or off."""
+        if state:
+            # SAFETY CHECK: Turn off Spa Heater and Spa Mode before turning on Pool Mode
+            print("[API] SAFETY CHECK: Ensuring Spa is OFF before turning Pool ON...")
+            self.spa_heat(False)
+            self.spa_mode(False)
         return self._toggle_equipment("POOL MODE", state)
 
     def spa_mode(self, state: bool):
         """Turns the Spa on or off."""
+        if not self.config.get("has_spa", True):
+            print("[API] CONFIG LOCKOUT: Spa Mode is disabled in config. Aborting.")
+            return False
+            
+        if state:
+            # SAFETY CHECK: Turn off Pool Heater and Pool Mode before turning on Spa Mode
+            print("[API] SAFETY CHECK: Ensuring Pool is OFF before turning Spa ON...")
+            self.cleaner(False)
+            self.pool_heat(False)
+            self.pool_mode(False)
+            
         return self._toggle_equipment("SPA MODE", state)
 
     def _toggle_heater(self, heater_name: str, pump_name: str, state: bool, temp: int = None):
@@ -474,10 +582,16 @@ class JandyController:
 
     def pool_heat(self, state: bool, temp: int = None):
         """Turns the pool heater on/off and optionally sets the temperature."""
+        if not self.config.get("has_pool_heater", True):
+            print("[API] CONFIG LOCKOUT: Pool Heater is disabled in config. Aborting.")
+            return False
         return self._toggle_heater("POOL HEATER", "POOL MODE", state, temp)
         
     def spa_heat(self, state: bool, temp: int = None):
         """Turns the spa heater on/off and optionally sets the temperature."""
+        if not self.config.get("has_spa_heater", True):
+            print("[API] CONFIG LOCKOUT: Spa Heater is disabled in config. Aborting.")
+            return False
         return self._toggle_heater("SPA HEATER", "SPA MODE", state, temp)
 
     def get_status(self) -> Dict[str, any]:
