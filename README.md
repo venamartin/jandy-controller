@@ -59,6 +59,11 @@ hardware:
   # ...
 ```
 
+> [!TIP]
+> **Finding your Serial Port on a Raspberry Pi / Linux**
+> - **USB Adapters:** If you aren't sure what your USB adapter is called, plug it into your machine and run `ls /dev/ttyUSB* /dev/ttyACM*`. It will almost always show up as `/dev/ttyUSB0`. You can also run `dmesg | tail -n 20` immediately after plugging it in to see the exact device name.
+> - **GPIO (Built-in) Serial:** If you are using an RS-485 HAT or wiring directly to the Raspberry Pi's built-in GPIO pins (Pins 8 & 10), your serial port will typically be `/dev/serial0` (which automatically maps to `ttyS0` or `ttyAMA0`). You may need to enable the serial port using `sudo raspi-config` first!
+
 4. **Run the Server**:
 The system includes a fully mobile-responsive Progressive Web App (PWA) dashboard. To run it continuously in the background, we recommend using `screen` or `tmux`.
 
