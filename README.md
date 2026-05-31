@@ -1,6 +1,8 @@
 # Jandy RS-485 Controller & Web App
 
-![Jandy Web App Dashboard](screenshot.jpg)
+<p align="center">
+  <img src="screenshot.jpg" alt="Jandy Web App Dashboard" width="350">
+</p>
 
 A Python library and web dashboard for controlling Jandy / Pentair Aqualink pool and spa systems over RS-485. 
 
