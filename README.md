@@ -24,12 +24,31 @@ Instead of relying on web interfaces or complex system spoofing, this library wo
 
 This project uses [uv](https://github.com/astral-sh/uv), an extremely fast Python package manager.
 
-1. **Install `uv`**:
+1. **Clone the Repository**:
+```bash
+git clone https://github.com/YOUR_USERNAME/jandy-controller.git
+cd jandy-controller
+```
+
+2. **Install `uv`**:
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-2. **Clone and Run**:
+3. **Configure your Hardware**:
+Open `config.yaml` to specify your serial port connection and toggle the hardware installed at your pool. 
+
+```yaml
+system:
+  serial_port: "/dev/ttyUSB0"
+
+hardware:
+  has_spa: true
+  has_cleaner: true
+  # ...
+```
+
+4. **Run the Server**:
 The system includes a fully mobile-responsive Progressive Web App (PWA) dashboard. To run it continuously in the background, we recommend using `screen` or `tmux`.
 
 **Using `screen`**:
@@ -55,6 +74,23 @@ uv run uvicorn web:app --host 0.0.0.0 --port 8000
 # To detach and leave it running, press: Ctrl+B, then D
 # To reattach later, run: tmux attach -t jandy
 ```
+
+5. **Start on Boot (Optional)**:
+To have the controller start automatically when your machine reboots, you can add a cron job. 
+
+Run `crontab -e` and add **one** of the following lines to the bottom of the file. Be sure to replace `/path/to/jandy-controller` with the actual path to your repository.
+
+**Using `screen`**:
+```bash
+@reboot cd /path/to/jandy-controller && screen -dmS jandy uv run uvicorn web:app --host 0.0.0.0 --port 8000
+```
+
+**Using `tmux`**:
+```bash
+@reboot cd /path/to/jandy-controller && tmux new-session -d -s jandy 'uv run uvicorn web:app --host 0.0.0.0 --port 8000'
+```
+
+*Note: `cron` environments do not load your normal terminal variables. If the script fails to run on boot, you may need to provide the absolute path to `uv` (e.g., `~/.local/bin/uv` or `~/.cargo/bin/uv`).*
 
 ## Available API Methods
 
