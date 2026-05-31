@@ -1,0 +1,2 @@
+use uv for all python tasks
+uv run does not require python in the commandline. It is uv run <python-file.py>
