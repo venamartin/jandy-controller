@@ -16,10 +16,10 @@ const waterTempEl = document.getElementById('water-temp');
 const controlGrid = document.getElementById('control-grid');
 const connectionStatus = document.getElementById('connection-status');
 const statusDot = document.querySelector('.dot');
-
 const tempModal = document.getElementById('temp-modal');
 const modalTitle = document.getElementById('modal-title');
 const modalTempValue = document.getElementById('modal-temp-value');
+const monitorBanner = document.getElementById('monitor-banner');
 
 const HARDWARE_MAP = [
     { id: 'pool_mode', label: 'Pool Mode', configKey: null, hasTemp: false },
@@ -28,6 +28,7 @@ const HARDWARE_MAP = [
     { id: 'spa_heat', label: 'Spa Heater', configKey: 'has_spa_heater', hasTemp: true },
     { id: 'pool_lights', label: 'Pool Lights', configKey: 'has_pool_lights', hasTemp: false },
     { id: 'spa_lights', label: 'Spa Lights', configKey: 'has_spa_lights', hasTemp: false },
+    { id: 'deck_lights', label: 'Deck Lights', configKey: 'has_deck_lights', hasTemp: false },
     { id: 'air_blower', label: 'Air Blower', configKey: 'has_blower', hasTemp: false },
     { id: 'cleaner', label: 'Cleaner', configKey: 'has_cleaner', hasTemp: false },
     { id: 'solar', label: 'Solar Heater', configKey: 'has_solar', hasTemp: false },
@@ -59,16 +60,28 @@ async function pollStatus() {
 
         // Update Button States
         updateButtonState('pool_mode', status.pool_mode_on);
-        updateButtonState('pool_heat', status.pool_heater_on, status.pool_heater_setpoint);
+        updateButtonState('pool_heat', status.pool_heater_on, status.pool_heater_setpoint, status.pool_heater_ena);
         updateButtonState('spa_mode', status.spa_mode_on);
-        updateButtonState('spa_heat', status.spa_heater_on, status.spa_heater_setpoint);
+        updateButtonState('spa_heat', status.spa_heater_on, status.spa_heater_setpoint, status.spa_heater_ena);
         updateButtonState('air_blower', status.blower_on);
         updateButtonState('pool_lights', status.pool_lights_on);
         updateButtonState('spa_lights', status.spa_lights_on);
+        updateButtonState('deck_lights', status.deck_lights_on);
         updateButtonState('solar', status.solar_on);
         updateButtonState('cleaner', status.cleaner_on);
 
         updateButtonDisabledStates(status);
+
+        // Monitor Mode Check
+        if (status.monitor_mode) {
+            monitorBanner.style.display = 'block';
+            document.querySelectorAll('.controls button').forEach(btn => btn.disabled = true);
+        } else {
+            monitorBanner.style.display = 'none';
+            // Enable buttons, then rely on updateButtonDisabledStates to do proper business logic disables
+            document.querySelectorAll('.controls button').forEach(btn => btn.disabled = false);
+            updateButtonDisabledStates(status);
+        }
 
         lastStatus = status;
 
@@ -108,7 +121,7 @@ function renderButtons() {
     });
 }
 
-function updateButtonState(action, isOn, setpoint = null) {
+function updateButtonState(action, isOn, setpoint = null, isEna = false) {
     const btn = document.getElementById(`btn-${action}`);
     if (!btn) return;
 
@@ -127,9 +140,15 @@ function updateButtonState(action, isOn, setpoint = null) {
     }
 
     if (isOn) {
-        btn.classList.add('active');
+        if (isEna) {
+            btn.classList.add('ena');
+            btn.classList.remove('active');
+        } else {
+            btn.classList.add('active');
+            btn.classList.remove('ena');
+        }
     } else {
-        btn.classList.remove('active');
+        btn.classList.remove('active', 'ena');
     }
 
     // Update setpoint badge if applicable
@@ -159,6 +178,11 @@ function updateButtonDisabledStates(status) {
     if (cleanerBtn) {
         cleanerBtn.disabled = !status.pool_mode_on;
     }
+
+    const solarBtn = document.getElementById('btn-solar');
+    if (solarBtn) {
+        solarBtn.disabled = status.spa_mode_on;
+    }
 }
 
 function handleButtonClick(action, hasTemp) {
@@ -168,7 +192,7 @@ function handleButtonClick(action, hasTemp) {
     // Remove sticky hover/focus states instantly on mobile
     btn.blur();
 
-    const currentlyOn = btn.classList.contains('active');
+    const currentlyOn = btn.classList.contains('active') || btn.classList.contains('ena');
     const newState = !currentlyOn;
 
     // If turning ON a heater, open the temp modal

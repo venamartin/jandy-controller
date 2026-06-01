@@ -22,12 +22,26 @@ def display_status(api):
 
 
 def main():
+    import sys
+    monitor_mode = False
+    if "--monitor" in sys.argv:
+        monitor_mode = True
+        sys.argv.remove("--monitor")
+        print("[TEST] Running in MONITOR MODE (TX disabled).")
+
     print("Starting Jandy Autonomous API Test...")
     # Logging is enabled here for debugging, but can be set to False for production!
-    api = JandyController(port='/dev/ttyUSB0', spoof_id=0x60, enable_logging=True, config_path="config.yaml")
+    api = JandyController(port='/dev/ttyUSB0', spoof_id=0x60, enable_logging=True, config_path="config.yaml", monitor_mode=monitor_mode)
     
     try:
-        if test == "spa":
+        if monitor_mode:
+            print("\n--- Monitoring Bus (Press Ctrl+C to stop) ---")
+            while True:
+                time.sleep(5)
+                print("\n--- Current Status ---")
+                pprint.pprint(api.get_status())
+                
+        elif test == "spa":
             
             # Test 1: Toggle SPA MODE ON
             print("\n--- Testing SPA MODE ON ---")

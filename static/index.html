@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -14,20 +15,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
+
 <body>
     <div class="dashboard">
         <header>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <h1>Jandy Control</h1>
-                <button class="btn-icon" style="width: 30px; height: 30px; font-size: 14px;" onclick="toggleFullScreen()" title="Toggle Fullscreen">⛶</button>
+                <button class="btn-icon" style="width: 30px; height: 30px; font-size: 14px;"
+                    onclick="toggleFullScreen()" title="Toggle Fullscreen">⛶</button>
             </div>
             <div class="status-indicator">
                 <span class="dot"></span>
                 <span id="connection-status">Connected</span>
             </div>
         </header>
+
+        <div id="monitor-banner" class="monitor-banner"
+            style="display: none; background-color: #f59e0b; color: #fff; text-align: center; padding: 10px; font-weight: bold; border-radius: 8px; margin: 0 20px 20px 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            Physical Remote In Use
+        </div>
 
         <section class="metrics">
             <div class="metric-card">
@@ -42,13 +50,13 @@
 
         <section class="controls">
             <h2>System Control</h2>
-            
+
             <div class="danger-zone" style="margin-bottom: 15px;">
                 <button class="btn btn-danger" onclick="sendCommand('all_off', false); this.blur();">
                     ALL OFF
                 </button>
             </div>
-            
+
             <div class="control-grid" id="control-grid">
                 <!-- Buttons will be injected here dynamically by app.js based on hardware config -->
             </div>
@@ -71,6 +79,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
+
 </html>

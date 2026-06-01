@@ -1,6 +1,6 @@
 system:
   serial_port: "/dev/ttyUSB0"
-  enable_logging: false
+  enable_logging: true
 
 hardware:
   has_spa: true
@@ -8,6 +8,7 @@ hardware:
   has_spa_heater: true
   has_pool_lights: true
   has_spa_lights: true
+  has_deck_lights: false
   has_blower: true
-  has_solar: false
+  has_solar: true
   has_cleaner: true

@@ -15,10 +15,16 @@ class JandyController:
     A robust, thread-safe controller that spoofs a PDA device on the Jandy RS-485 bus.
     It tracks the Master Controller's screen state to perform intelligent state-aware navigation.
     """
-    def __init__(self, port: str = '/dev/ttyUSB0', spoof_id: int = 0x60, enable_logging: bool = True, log_file_path: str = "api-test.log", config_path: str = "config.yaml"):
+    def __init__(self, port: str = '/dev/ttyUSB0', spoof_id: int = 0x60, enable_logging: bool = True, log_file_path: str = "api-test.log", config_path: str = "config.yaml", monitor_mode: bool = False):
         self.port = port
         self.spoof_id = spoof_id
         self.enable_logging = enable_logging
+        self.monitor_mode = monitor_mode
+        self.dynamic_monitor_timeout = 0.0
+        self.pending_ack = False
+        self.pending_ack_time = 0.0
+        self.pending_button_val = 0x00
+        
         self.log_file = None
         if self.enable_logging:
             self.log_file = open(log_file_path, "w")
@@ -64,7 +70,9 @@ class JandyController:
             "pool_mode_on": False,
             "spa_mode_on": False,
             "pool_heater_on": False,
+            "pool_heater_ena": False,
             "spa_heater_on": False,
+            "spa_heater_ena": False,
             "solar_on": None, # Unimplemented
             "blower_on": None, # Unimplemented
             "pool_lights_on": None, # Unimplemented
@@ -95,7 +103,8 @@ class JandyController:
 
     def _log(self, prefix: str, msg: str):
         if self.log_file:
-            self.log_file.write(f"{datetime.now()} - [{prefix}] {msg}\n")
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+            self.log_file.write(f"{timestamp} - [{prefix}] {msg}\n")
             self.log_file.flush()
 
     def _run_bus(self):
@@ -131,9 +140,27 @@ class JandyController:
                 
                 self._handle_packet(packet)
             
-            time.sleep(0.01)
+            # Check for delayed ACK (35ms delay)
+            if self.pending_ack and (time.time() - self.pending_ack_time >= 0.035):
+                self.pending_ack = False
+                
+                # Construct ACK
+                ack_bytes = bytearray([0x10, 0x02, 0x00, 0x01, 0x40, self.pending_button_val, 0x00, 0x10, 0x03])
+                chk = calculate_checksum(ack_bytes)
+                ack_bytes[-3] = chk
+                self.ser.write(ack_bytes)
+                
+                hex_bytes = " ".join(f"{b:02X}" for b in ack_bytes)
+                self._log("SEND", hex_bytes)
+            
+            time.sleep(0.005)
 
     def _handle_packet(self, packet: JandyPacket):
+        # Track the destination of the last command sent by the Master
+        # Any packet not sent TO 0x00 (Master) is sent BY the Master
+        if packet.dest != 0x00:
+            self.last_master_dest = packet.dest
+
         # Update JXi Ping Status
         if packet.cmd == CMD_JXI_PING and len(packet.payload) >= 4:
             with self.lock:
@@ -165,17 +192,21 @@ class JandyController:
                     elif "SPA MODE" in text:
                         self.status["spa_mode_on"] = " ON" in text
                     elif "POOL HEATER" in text:
-                        self.status["pool_heater_on"] = " ON" in text
+                        self.status["pool_heater_on"] = " ON" in text or " ENA" in text
+                        self.status["pool_heater_ena"] = " ENA" in text
                     elif "SPA HEATER" in text:
-                        self.status["spa_heater_on"] = " ON" in text
+                        self.status["spa_heater_on"] = " ON" in text or " ENA" in text
+                        self.status["spa_heater_ena"] = " ENA" in text
                     elif "AIR BLOWER" in text:
                         self.status["blower_on"] = " OFF" not in text and "***" not in text
                     elif "POOL LIGHT" in text:
                         self.status["pool_lights_on"] = " OFF" not in text and "***" not in text
                     elif "SPA LIGHT" in text:
                         self.status["spa_lights_on"] = " OFF" not in text and "***" not in text
-                    elif "SOLAR HEATER" in text:
+                    elif "SOLAR HEAT" in text:
                         self.status["solar_on"] = " OFF" not in text and "***" not in text
+                    elif "DECK LIGHT" in text:
+                        self.status["deck_lights_on"] = " OFF" not in text and "***" not in text
                     elif "CLEANER" in text:
                         self.status["cleaner_on"] = " OFF" not in text and "***" not in text
         
@@ -185,26 +216,39 @@ class JandyController:
                 with self.lock:
                     self.cursor_line = packet.payload[0]
         
+        # Monitor Mode Check
+        if packet.dest == 0x00 and packet.cmd == 0x01:
+            # ONLY trigger monitor mode if this ACK was in response to a packet directed at OUR spoofed ID!
+            if getattr(self, "last_master_dest", None) == self.spoof_id:
+                # Is it the physical remote or our own echo?
+                # If we are pending an ACK, we haven't sent ours yet, so it must be the physical remote.
+                # If we are in monitor mode, we don't send ACKs, so it must be the physical remote.
+                if getattr(self, "pending_ack", False) or self.monitor_mode:
+                    if getattr(self, "pending_ack", False):
+                        self.pending_ack = False
+                        print("[API] Physical remote active! Yielding bus for 30s.")
+                    
+                    self.dynamic_monitor_timeout = time.time() + 30.0
+
         # Reply to Master (We must ACK ANY packet sent to our spoof ID to stay alive)
-        if packet.dest == self.spoof_id and packet.cmd != 0x01:
+        if not self.monitor_mode and packet.dest == self.spoof_id and packet.cmd != 0x01:
+            if time.time() < self.dynamic_monitor_timeout:
+                return # We are yielding to the physical remote
+                
             button_val = BUTTON_CODES["NONE"]
             try:
                 # Non-blocking pop from the queue
                 cmd = self._button_queue.get_nowait()
                 button_val = BUTTON_CODES[cmd]
-                print(f"[API] Sent Button: {cmd}")
+                print(f"[API] Queued Button: {cmd}")
                 self._button_event.set() # Signal that the button was sent
             except queue.Empty:
                 pass
             
-            # Construct ACK
-            ack_bytes = bytearray([0x10, 0x02, 0x00, 0x01, 0x40, button_val, 0x00, 0x10, 0x03])
-            chk = calculate_checksum(ack_bytes)
-            ack_bytes[-3] = chk
-            self.ser.write(ack_bytes)
-            
-            hex_bytes = " ".join(f"{b:02X}" for b in ack_bytes)
-            self._log("SEND", hex_bytes)
+            # Defer the ACK by 35ms
+            self.pending_ack = True
+            self.pending_ack_time = time.time()
+            self.pending_button_val = button_val
 
     # =======================================================
     # Navigation Primitives
@@ -301,7 +345,18 @@ class JandyController:
             
             # Scroll
             self.press(direction, 0.0) 
-            self.wait_for_cursor_change(old_cursor=cursor_idx, timeout=5.0)
+            
+            # Wait for EITHER the cursor to move OR the text under the cursor to change
+            start_time = time.time()
+            while time.time() - start_time < 5.0:
+                with self.lock:
+                    new_cursor = self.cursor_line
+                    new_text = self.screen_lines.get(new_cursor, "")
+                
+                if new_cursor != cursor_idx or new_text != cursor_text:
+                    break
+                time.sleep(0.1)
+                
             time.sleep(0.2) # Allow text to settle
             scrolls += 1
             
@@ -363,7 +418,8 @@ class JandyController:
         if equip_name == "AIR BLOWER": self.status["blower_on"] = is_on
         elif equip_name == "POOL LIGHT": self.status["pool_lights_on"] = is_on
         elif equip_name == "SPA LIGHT": self.status["spa_lights_on"] = is_on
-        elif equip_name == "SOLAR HEATER": self.status["solar_on"] = is_on
+        elif equip_name == "SOLAR HEAT": self.status["solar_on"] = is_on
+        elif equip_name == "DECK LIGHT": self.status["deck_lights_on"] = is_on
         elif equip_name == "CLEANER": self.status["cleaner_on"] = is_on
         
         if is_on == desired_state:
@@ -379,7 +435,8 @@ class JandyController:
         if equip_name == "AIR BLOWER": self.status["blower_on"] = desired_state
         elif equip_name == "POOL LIGHT": self.status["pool_lights_on"] = desired_state
         elif equip_name == "SPA LIGHT": self.status["spa_lights_on"] = desired_state
-        elif equip_name == "SOLAR HEATER": self.status["solar_on"] = desired_state
+        elif equip_name == "SOLAR HEAT": self.status["solar_on"] = desired_state
+        elif equip_name == "DECK LIGHT": self.status["deck_lights_on"] = desired_state
         elif equip_name == "CLEANER": self.status["cleaner_on"] = desired_state
         
         self.press("BACK")
@@ -402,7 +459,9 @@ class JandyController:
         self.status["pool_mode_on"] = False
         self.status["spa_mode_on"] = False
         self.status["pool_heater_on"] = False
+        self.status["pool_heater_ena"] = False
         self.status["spa_heater_on"] = False
+        self.status["spa_heater_ena"] = False
         self.status["blower_on"] = False
         self.status["pool_lights_on"] = False
         self.status["spa_lights_on"] = False
@@ -443,12 +502,29 @@ class JandyController:
             return False
         return self._toggle_aux_equipment("SPA LIGHT", state)
 
+    def deck_lights(self, state: bool):
+        """Turns the Deck Lights on or off."""
+        if not self.config.get("has_deck_lights", True):
+            print("[API] CONFIG LOCKOUT: Deck Lights are disabled in config. Aborting.")
+            return False
+        return self._toggle_aux_equipment("DECK LIGHT", state)
+
     def solar(self, state: bool):
         """Turns the Solar Heater on or off."""
         if not self.config.get("has_solar", True):
             print("[API] CONFIG LOCKOUT: Solar Heater is disabled in config. Aborting.")
             return False
-        return self._toggle_aux_equipment("SOLAR HEATER", state)
+            
+        if state:
+            # SAFETY CHECK: Solar Heat requires Spa Mode to be OFF
+            self.go_home()
+            if not self.navigate_to("SPA MODE"):
+                return False
+            if " ON" in self.get_cursor_text():
+                print("[API] SAFETY LOCKOUT: Cannot turn on Solar Heat while Spa Mode is ON.")
+                return False
+                
+        return self._toggle_aux_equipment("SOLAR HEAT", state)
 
     def cleaner(self, state: bool):
         """Turns the Cleaner on or off."""
@@ -470,10 +546,20 @@ class JandyController:
     def pool_mode(self, state: bool):
         """Turns the Pool on or off."""
         if state:
-            # SAFETY CHECK: Turn off Spa Heater and Spa Mode before turning on Pool Mode
-            print("[API] SAFETY CHECK: Ensuring Spa is OFF before turning Pool ON...")
+            # SAFETY CHECK: Turn off Spa Heater before turning on Pool Mode
+            print("[API] SAFETY CHECK: Ensuring Spa Heater is OFF before turning Pool ON...")
             self.spa_heat(False)
-            self.spa_mode(False)
+            
+            if self.config.get("has_spa", True):
+                # SAFETY CHECK: Turn off Spa Mode before turning on Pool Mode
+                self.go_home()
+                if self.navigate_to("SPA MODE"):
+                    if " ON" in self.get_cursor_text():
+                        print("[API] SAFETY CHECK: Spa Mode is ON. Turning it OFF before turning Pool ON...")
+                        self._toggle_equipment("SPA MODE", False)
+                        print("[API] Waiting 35 seconds for Jandy firmware to process the valve transition...")
+                        time.sleep(35.0)
+                    
         return self._toggle_equipment("POOL MODE", state)
 
     def spa_mode(self, state: bool):
@@ -483,11 +569,20 @@ class JandyController:
             return False
             
         if state:
-            # SAFETY CHECK: Turn off Pool Heater and Pool Mode before turning on Spa Mode
-            print("[API] SAFETY CHECK: Ensuring Pool is OFF before turning Spa ON...")
+            # SAFETY CHECK: Turn off Pool Heater, Solar Heat, and Cleaner before turning on Spa Mode
+            print("[API] SAFETY CHECK: Ensuring Pool Equipment is OFF before turning Spa ON...")
             self.cleaner(False)
+            self.solar(False)
             self.pool_heat(False)
-            self.pool_mode(False)
+            
+            # SAFETY CHECK: Turn off Pool Mode before turning on Spa Mode
+            self.go_home()
+            if self.navigate_to("POOL MODE"):
+                if " ON" in self.get_cursor_text():
+                    print("[API] SAFETY CHECK: Pool Mode is ON. Turning it OFF before turning Spa ON...")
+                    self._toggle_equipment("POOL MODE", False)
+                    print("[API] Waiting 35 seconds for Jandy firmware to process the valve transition...")
+                    time.sleep(35.0)
             
         return self._toggle_equipment("SPA MODE", state)
 
@@ -516,7 +611,7 @@ class JandyController:
             print(f"[API] SAFETY LOCKOUT: {heater_name.strip()} is in a transitional state (***). Aborting.")
             return False
             
-        is_on = " ON" in current_text
+        is_on = " ON" in current_text or " ENA" in current_text
         
         if not state:
             if not is_on:
@@ -602,4 +697,6 @@ class JandyController:
         """
         with self.lock:
             # Return a copy to avoid dictionary mutation during iteration by the caller
-            return self.status.copy()
+            ret = self.status.copy()
+            ret["monitor_mode"] = self.monitor_mode or (time.time() < self.dynamic_monitor_timeout)
+            return ret

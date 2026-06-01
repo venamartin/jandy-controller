@@ -21,8 +21,16 @@ except Exception as e:
     serial_port = "/dev/ttyUSB0"
     enable_logging = False
 
+import sys
+
+monitor_mode = False
+if "--monitor" in sys.argv:
+    monitor_mode = True
+    sys.argv.remove("--monitor")
+    print("[WEB] Running in MONITOR MODE (TX disabled).")
+
 # --- API & Queue Initialization ---
-api = JandyController(port=serial_port, spoof_id=0x60, enable_logging=enable_logging, config_path="config.yaml")
+api = JandyController(port=serial_port, spoof_id=0x60, enable_logging=enable_logging, config_path="config.yaml", monitor_mode=monitor_mode)
 
 command_queue = queue.Queue()
 
@@ -61,7 +69,7 @@ worker_thread.start()
 app = FastAPI(title="Jandy Autonomous API")
 
 # Mount the static folder at the root to serve index.html, style.css, and app.js
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
 class CommandRequest(BaseModel):
     action: str
