@@ -12,9 +12,10 @@ import yaml
 import os
 
 # --- Load Config ---
-config_path = "config.yaml"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+config_path = os.path.join(BASE_DIR, "config.yaml")
 if not os.path.exists(config_path):
-    fallback_path = "config.example.yaml"
+    fallback_path = os.path.join(BASE_DIR, "config.example.yaml")
     if os.path.exists(fallback_path):
         print(f"[WEB] Warning: {config_path} not found. Falling back to {fallback_path}.")
         config_path = fallback_path
@@ -45,7 +46,14 @@ else:
     print("[WEB] Uvicorn access log enabled.")
 
 # --- API & Queue Initialization ---
-api = JandyController(port=serial_port, spoof_id=0x60, enable_logging=enable_logging, config_path="config.yaml", monitor_mode=monitor_mode)
+api = JandyController(
+    port=serial_port, 
+    spoof_id=0x60, 
+    enable_logging=enable_logging, 
+    log_file_path=os.path.join(BASE_DIR, "api-test.log"),
+    config_path=config_path, 
+    monitor_mode=monitor_mode
+)
 
 command_queue = queue.Queue()
 
@@ -84,7 +92,7 @@ worker_thread.start()
 app = FastAPI(title="Jandy Autonomous API")
 
 # Mount the static folder at the root to serve index.html, style.css, and app.js
-app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static"), html=True), name="static")
 
 class CommandRequest(BaseModel):
     action: str

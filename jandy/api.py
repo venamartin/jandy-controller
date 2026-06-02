@@ -41,7 +41,8 @@ class JandyController:
         }
         
         if not os.path.exists(config_path):
-            fallback_path = "config.example.yaml"
+            fallback_dir = os.path.dirname(config_path)
+            fallback_path = os.path.join(fallback_dir, "config.example.yaml") if fallback_dir else "config.example.yaml"
             if os.path.exists(fallback_path):
                 print(f"[API] Warning: {config_path} not found. Falling back to {fallback_path}.")
                 config_path = fallback_path
