@@ -48,6 +48,20 @@ echo "Using uv at: $UV_PATH"
 echo "=> Syncing Python dependencies..."
 $UV_PATH sync
 
+# Check serial permissions
+echo "=> Checking serial port permissions..."
+NEEDS_REBOOT=false
+if ! groups "$USER" | grep -q "\bdialout\b"; then
+    echo "Adding $USER to dialout group..."
+    sudo usermod -a -G dialout "$USER"
+    NEEDS_REBOOT=true
+fi
+if ! groups "$USER" | grep -q "\btty\b"; then
+    echo "Adding $USER to tty group..."
+    sudo usermod -a -G tty "$USER"
+    NEEDS_REBOOT=true
+fi
+
 # Config setup
 echo "=> Checking configuration..."
 if [ ! -f "config.yaml" ]; then
@@ -86,11 +100,18 @@ echo "Installing service to /etc/systemd/system/jandy.service..."
 sudo mv $SERVICE_FILE /etc/systemd/system/jandy.service
 sudo systemctl daemon-reload
 sudo systemctl enable jandy
-sudo systemctl restart jandy
-
+if [ "$NEEDS_REBOOT" = false ]; then
+    sudo systemctl restart jandy
+fi
 echo "==============================================="
 echo " Installation Complete!"
 echo " The Jandy controller is now running in the background."
 echo " To view the live logs, run:"
 echo "   sudo journalctl -fu jandy"
+if [ "$NEEDS_REBOOT" = true ]; then
+    echo ""
+    echo " IMPORTANT: You have been added to the serial port permission groups."
+    echo " You MUST reboot your Raspberry Pi for this to take effect:"
+    echo "   sudo reboot"
+fi
 echo "==============================================="
