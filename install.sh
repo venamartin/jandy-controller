@@ -86,7 +86,7 @@ echo "Installing service to /etc/systemd/system/jandy.service..."
 sudo mv $SERVICE_FILE /etc/systemd/system/jandy.service
 sudo systemctl daemon-reload
 sudo systemctl enable jandy
-sudo systemctl start jandy
+sudo systemctl restart jandy
 
 echo "==============================================="
 echo " Installation Complete!"
