@@ -60,6 +60,7 @@ class LogCatcher:
             line, self.buffer = self.buffer.split("\n", 1)
             if "[API]" in line or "[WEB]" in line:
                 self.logs.append(line)
+        self.flush()
 
     def flush(self):
         self.original_stdout.flush()

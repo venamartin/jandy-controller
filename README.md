@@ -92,6 +92,7 @@ hardware:
 > **Finding your Serial Port on a Raspberry Pi / Linux**
 > - **USB Adapters:** If you aren't sure what your USB adapter is called, plug it into your machine and run `ls /dev/ttyUSB* /dev/ttyACM*`. It will almost always show up as `/dev/ttyUSB0`. You can also run `dmesg | tail -n 20` immediately after plugging it in to see the exact device name.
 > - **GPIO (Built-in) Serial:** If you are using an RS-485 HAT or wiring directly to the Raspberry Pi's built-in GPIO pins (Pins 8 & 10), your serial port will typically be `/dev/serial0` (which automatically maps to `ttyS0` or `ttyAMA0`). You may need to enable the serial port using `sudo raspi-config` first!
+> - **PermissionError [Errno 13]:** If you see `Permission denied: '/dev/ttyUSB0'` in your logs, your user doesn't have permission to read serial ports. Fix this by running `sudo usermod -a -G dialout $USER` (and `sudo usermod -a -G tty $USER`) and then rebooting your machine.
 
 5. **Run the Server (Systemd)**:
 The system includes a fully mobile-responsive Progressive Web App (PWA) dashboard. The most robust way to run the controller in the background on Linux/Raspberry Pi is using a `systemd` service.
