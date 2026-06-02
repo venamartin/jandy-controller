@@ -37,7 +37,7 @@ You can use the included installation script to automatically install dependenci
 
 1. **Clone the Repository**:
 ```bash
-git clone https://github.com/YOUR_USERNAME/jandy-controller.git
+git clone https://github.com/venamartin/jandy-controller.git
 cd jandy-controller
 ```
 
