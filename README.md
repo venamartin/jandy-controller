@@ -47,7 +47,11 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 3. **Configure your Hardware**:
-Open `config.yaml` to specify your serial port connection and toggle the hardware installed at your pool. 
+Copy the example configuration file:
+```bash
+cp config.example.yaml config.yaml
+```
+Then open `config.yaml` to specify your serial port connection and toggle the hardware installed at your pool. 
 
 ```yaml
 system:

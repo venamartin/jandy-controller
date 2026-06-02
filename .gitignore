@@ -7,6 +7,10 @@ wheels/
 *.egg-info
 
 AqualinkD/
+*.log
 
 # Virtual environments
 .venv
+
+# Local Configuration
+config.yaml

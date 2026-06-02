@@ -1,6 +1,6 @@
 system:
   serial_port: "/dev/ttyUSB0"
-  enable_logging: true
+  enable_logging: false
 
 hardware:
   has_spa: true

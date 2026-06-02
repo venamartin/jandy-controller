@@ -9,10 +9,18 @@ import time
 from jandy import JandyController
 
 import yaml
+import os
 
 # --- Load Config ---
+config_path = "config.yaml"
+if not os.path.exists(config_path):
+    fallback_path = "config.example.yaml"
+    if os.path.exists(fallback_path):
+        print(f"[WEB] Warning: {config_path} not found. Falling back to {fallback_path}.")
+        config_path = fallback_path
+
 try:
-    with open("config.yaml", "r") as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
         serial_port = config.get("system", {}).get("serial_port", "/dev/ttyUSB0")
         enable_logging = config.get("system", {}).get("enable_logging", False)
@@ -22,12 +30,19 @@ except Exception as e:
     enable_logging = False
 
 import sys
+import logging
 
 monitor_mode = False
 if "--monitor" in sys.argv:
     monitor_mode = True
     sys.argv.remove("--monitor")
     print("[WEB] Running in MONITOR MODE (TX disabled).")
+
+# Reverse uvicorn's default access log behavior: hide by default unless --access-log is explicitly passed
+if "--access-log" not in sys.argv:
+    logging.getLogger("uvicorn.access").disabled = True
+else:
+    print("[WEB] Uvicorn access log enabled.")
 
 # --- API & Queue Initialization ---
 api = JandyController(port=serial_port, spoof_id=0x60, enable_logging=enable_logging, config_path="config.yaml", monitor_mode=monitor_mode)

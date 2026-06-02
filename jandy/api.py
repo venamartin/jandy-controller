@@ -40,6 +40,12 @@ class JandyController:
             "has_solar": True
         }
         
+        if not os.path.exists(config_path):
+            fallback_path = "config.example.yaml"
+            if os.path.exists(fallback_path):
+                print(f"[API] Warning: {config_path} not found. Falling back to {fallback_path}.")
+                config_path = fallback_path
+                
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 data = yaml.safe_load(f)
@@ -56,6 +62,9 @@ class JandyController:
         self._running = True
         self._button_queue = queue.Queue()
         self.lock = threading.Lock()
+        
+        # Reverse-Engineering State
+        self.last_payloads = {}
         
         # Screen State
         self.screen_lines: Dict[int, str] = {}
@@ -161,6 +170,14 @@ class JandyController:
         if packet.dest != 0x00:
             self.last_master_dest = packet.dest
 
+        # Reverse-Engineering Logger (Deduplicated Broadcasts)
+        if packet.cmd not in (0x00, 0x04, 0x08, 0x09, 0x0A, 0x0B):  # Ignore probes and PDA screen updates
+            sig = (packet.dest, packet.cmd)
+            if self.last_payloads.get(sig) != packet.payload:
+                self.last_payloads[sig] = packet.payload
+                hex_payload = " ".join(f"{b:02X}" for b in packet.payload)
+                self._log("REVERSE", f"DEST: {packet.dest:02X} | CMD: {packet.cmd:02X} | PAY: {hex_payload}")
+
         # Update JXi Ping Status
         if packet.cmd == CMD_JXI_PING and len(packet.payload) >= 4:
             with self.lock:
@@ -236,14 +253,20 @@ class JandyController:
                 return # We are yielding to the physical remote
                 
             button_val = BUTTON_CODES["NONE"]
-            try:
-                # Non-blocking pop from the queue
-                cmd = self._button_queue.get_nowait()
-                button_val = BUTTON_CODES[cmd]
-                print(f"[API] Queued Button: {cmd}")
-                self._button_event.set() # Signal that the button was sent
-            except queue.Empty:
-                pass
+            
+            # CRITICAL PROTOCOL RULE: Button presses can ONLY be sent in response to Probes (0x00)
+            # or Status packets (0x02). Once a device is active, the Master stops sending 0x00 and
+            # relies entirely on 0x02 for polling. If we send a button press in response to a Screen
+            # Update (0x04, 0x08, etc.), the Master ignores it.
+            if packet.cmd in (0x00, 0x02):
+                try:
+                    # Non-blocking pop from the queue
+                    cmd = self._button_queue.get_nowait()
+                    button_val = BUTTON_CODES[cmd]
+                    print(f"[API] Queued Button: {cmd}")
+                    self._button_event.set() # Signal that the button was sent
+                except queue.Empty:
+                    pass
             
             # Defer the ACK by 35ms
             self.pending_ack = True
