@@ -55,7 +55,7 @@ This project uses [uv](https://github.com/astral-sh/uv), an extremely fast Pytho
 
 1. **Clone the Repository**:
 ```bash
-git clone https://github.com/YOUR_USERNAME/jandy-controller.git
+git clone https://github.com/venamartin/jandy-controller.git
 cd jandy-controller
 ```
 
