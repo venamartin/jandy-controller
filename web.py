@@ -45,6 +45,28 @@ if "--access-log" not in sys.argv:
 else:
     print("[WEB] Uvicorn access log enabled.")
 
+from collections import deque
+
+class LogCatcher:
+    def __init__(self, original_stdout):
+        self.original_stdout = original_stdout
+        self.logs = deque(maxlen=100)
+        self.buffer = ""
+
+    def write(self, text):
+        self.original_stdout.write(text)
+        self.buffer += text
+        while "\n" in self.buffer:
+            line, self.buffer = self.buffer.split("\n", 1)
+            if "[API]" in line or "[WEB]" in line:
+                self.logs.append(line)
+
+    def flush(self):
+        self.original_stdout.flush()
+
+log_catcher = LogCatcher(sys.stdout)
+sys.stdout = log_catcher
+
 # --- API & Queue Initialization ---
 api = JandyController(
     port=serial_port, 
@@ -104,7 +126,8 @@ def get_status():
     """Returns the instant snapshot of the equipment state and hardware configuration."""
     return {
         "status": api.get_status(),
-        "config": api.config
+        "config": api.config,
+        "logs": list(log_catcher.logs)
     }
 
 @app.post("/api/command")

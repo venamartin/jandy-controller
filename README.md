@@ -31,10 +31,27 @@ The system works by spoofing a Jandy PDA Handheld Remote (`0x60`). It runs a bac
 
 ## Quickstart
 
-### Installation
+### Option 1: Automated Installation (Recommended)
+
+You can use the included installation script to automatically install dependencies, set up your configuration, and create the background systemd service.
+
+1. **Clone the Repository**:
+```bash
+git clone https://github.com/YOUR_USERNAME/jandy-controller.git
+cd jandy-controller
+```
+
+2. **Run the Installer**:
+```bash
+bash install.sh
+```
+The script will automatically install `uv`, sync dependencies, prompt you to configure your hardware, and create the `jandy.service` for systemd.
+
+---
+
+### Option 2: Manual Installation
 
 This project uses [uv](https://github.com/astral-sh/uv), an extremely fast Python package manager.
-
 
 1. **Clone the Repository**:
 ```bash
@@ -47,8 +64,18 @@ cd jandy-controller
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
+3. **Install Dependencies**:
+```bash
+uv sync
+```
+
 4. **Configure your Hardware**:
-Open `config.yaml` to specify your serial port connection and toggle the hardware installed at your pool. 
+Copy the example configuration file and edit it using nano:
+```bash
+cp config.example.yaml config.yaml
+nano config.yaml
+```
+Inside the file, specify your serial port connection and toggle the hardware installed at your pool. 
 
 ```yaml
 system:
@@ -66,49 +93,44 @@ hardware:
 > - **USB Adapters:** If you aren't sure what your USB adapter is called, plug it into your machine and run `ls /dev/ttyUSB* /dev/ttyACM*`. It will almost always show up as `/dev/ttyUSB0`. You can also run `dmesg | tail -n 20` immediately after plugging it in to see the exact device name.
 > - **GPIO (Built-in) Serial:** If you are using an RS-485 HAT or wiring directly to the Raspberry Pi's built-in GPIO pins (Pins 8 & 10), your serial port will typically be `/dev/serial0` (which automatically maps to `ttyS0` or `ttyAMA0`). You may need to enable the serial port using `sudo raspi-config` first!
 
-5. **Run the Server**:
-The system includes a fully mobile-responsive Progressive Web App (PWA) dashboard. To run it continuously in the background, we recommend using `screen` or `tmux`.
+5. **Run the Server (Systemd)**:
+The system includes a fully mobile-responsive Progressive Web App (PWA) dashboard. The most robust way to run the controller in the background on Linux/Raspberry Pi is using a `systemd` service.
 
-**Using `screen`**:
+1. **Create the service file:**
 ```bash
-# Start a new screen session
-screen -S jandy
-
-# Run the web server using uv
-uv run uvicorn web:app --host 0.0.0.0 --port 8000
-
-# To detach and leave it running, press: Ctrl+A, then D
-# To reattach later, run: screen -r jandy
+sudo nano /etc/systemd/system/jandy.service
 ```
 
-**Using `tmux`**:
-```bash
-# Start a new tmux session
-tmux new -s jandy
+2. **Paste the following configuration** (be sure to replace `/path/to/jandy-controller` and `yourusername` with your actual path and username):
+```ini
+[Unit]
+Description=Jandy RS-485 Controller
+After=network.target
 
-# Run the web server using uv
-uv run uvicorn web:app --host 0.0.0.0 --port 8000
+[Service]
+User=yourusername
+WorkingDirectory=/path/to/jandy-controller
+# Note: Provide the absolute path to uv if it's not in the system PATH (e.g., /home/yourusername/.local/bin/uv)
+ExecStart=/home/yourusername/.local/bin/uv run uvicorn web:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
 
-# To detach and leave it running, press: Ctrl+B, then D
-# To reattach later, run: tmux attach -t jandy
+[Install]
+WantedBy=multi-user.target
 ```
 
-6. **Start on Boot (Optional)**:
-To have the controller start automatically when your machine reboots, you can add a cron job. 
-
-Run `crontab -e` and add **one** of the following lines to the bottom of the file. Be sure to replace `/path/to/jandy-controller` with the actual path to your repository.
-
-**Using `screen`**:
+3. **Enable and start the service:**
 ```bash
-@reboot cd /path/to/jandy-controller && screen -dmS jandy uv run uvicorn web:app --host 0.0.0.0 --port 8000
+sudo systemctl daemon-reload
+sudo systemctl enable jandy
+sudo systemctl start jandy
 ```
 
-**Using `tmux`**:
+4. **View the Logs:**
+You can see the systemd log files (journal) in real-time by running:
 ```bash
-@reboot cd /path/to/jandy-controller && tmux new-session -d -s jandy 'uv run uvicorn web:app --host 0.0.0.0 --port 8000'
+sudo journalctl -fu jandy
 ```
-
-*Note: `cron` environments do not load your normal terminal variables. If the script fails to run on boot, you may need to provide the absolute path to `uv` (e.g., `~/.local/bin/uv` or `~/.cargo/bin/uv`).*
 
 ## Available API Methods
 

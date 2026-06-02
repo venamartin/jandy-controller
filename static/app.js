@@ -21,6 +21,30 @@ const modalTitle = document.getElementById('modal-title');
 const modalTempValue = document.getElementById('modal-temp-value');
 const monitorBanner = document.getElementById('monitor-banner');
 
+// Log Elements
+const logContainer = document.getElementById('log-container');
+const logTerminal = document.getElementById('log-terminal');
+const logToggleIcon = document.getElementById('log-toggle-icon');
+let isUserScrollingLog = false;
+
+function toggleLogs() {
+    if (logContainer.style.display === 'none') {
+        logContainer.style.display = 'block';
+        logToggleIcon.textContent = '▲';
+        logTerminal.scrollTop = logTerminal.scrollHeight;
+    } else {
+        logContainer.style.display = 'none';
+        logToggleIcon.textContent = '▼';
+    }
+}
+
+if (logTerminal) {
+    logTerminal.addEventListener('scroll', () => {
+        const isAtBottom = logTerminal.scrollHeight - logTerminal.clientHeight <= logTerminal.scrollTop + 10;
+        isUserScrollingLog = !isAtBottom;
+    });
+}
+
 const HARDWARE_MAP = [
     { id: 'pool_mode', label: 'Pool Mode', configKey: null, hasTemp: false },
     { id: 'pool_heat', label: 'Pool Heater', configKey: 'has_pool_heater', hasTemp: true },
@@ -84,6 +108,18 @@ async function pollStatus() {
         }
 
         lastStatus = status;
+
+        // Update Logs
+        if (data.logs && data.logs.length > 0) {
+            const currentLogHTML = data.logs.join('\n');
+            if (logTerminal.textContent !== currentLogHTML) {
+                const isAtBottom = logTerminal.scrollHeight - logTerminal.clientHeight <= logTerminal.scrollTop + 2;
+                logTerminal.textContent = currentLogHTML;
+                if ((isAtBottom && !isUserScrollingLog) || logContainer.style.display === 'none') {
+                    logTerminal.scrollTop = logTerminal.scrollHeight;
+                }
+            }
+        }
 
     } catch (error) {
         console.error('Error fetching status:', error);

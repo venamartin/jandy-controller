@@ -61,6 +61,16 @@
                 <!-- Buttons will be injected here dynamically by app.js based on hardware config -->
             </div>
         </section>
+
+        <!-- Log Terminal Section -->
+        <div class="log-section">
+            <button class="log-toggle-btn" onclick="toggleLogs()">
+                <span id="log-toggle-icon">▼</span> System Logs
+            </button>
+            <div id="log-container" class="log-container" style="display: none;">
+                <div id="log-terminal" class="log-terminal"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Temperature Modal Template (Hidden by default) -->
