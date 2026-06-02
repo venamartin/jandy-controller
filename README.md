@@ -35,6 +35,7 @@ The system works by spoofing a Jandy PDA Handheld Remote (`0x60`). It runs a bac
 
 This project uses [uv](https://github.com/astral-sh/uv), an extremely fast Python package manager.
 
+
 1. **Clone the Repository**:
 ```bash
 git clone https://github.com/YOUR_USERNAME/jandy-controller.git
@@ -46,7 +47,14 @@ cd jandy-controller
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-3. **Configure your Hardware**:
+3. **Sync the project**:
+This will install Python, dependencies, and creates .venv for uv.
+
+```bash
+uv sync
+```
+
+4. **Configure your Hardware**:
 Open `config.yaml` to specify your serial port connection and toggle the hardware installed at your pool. 
 
 ```yaml
@@ -65,7 +73,7 @@ hardware:
 > - **USB Adapters:** If you aren't sure what your USB adapter is called, plug it into your machine and run `ls /dev/ttyUSB* /dev/ttyACM*`. It will almost always show up as `/dev/ttyUSB0`. You can also run `dmesg | tail -n 20` immediately after plugging it in to see the exact device name.
 > - **GPIO (Built-in) Serial:** If you are using an RS-485 HAT or wiring directly to the Raspberry Pi's built-in GPIO pins (Pins 8 & 10), your serial port will typically be `/dev/serial0` (which automatically maps to `ttyS0` or `ttyAMA0`). You may need to enable the serial port using `sudo raspi-config` first!
 
-4. **Run the Server**:
+5. **Run the Server**:
 The system includes a fully mobile-responsive Progressive Web App (PWA) dashboard. To run it continuously in the background, we recommend using `screen` or `tmux`.
 
 **Using `screen`**:
@@ -92,7 +100,7 @@ uv run uvicorn web:app --host 0.0.0.0 --port 8000
 # To reattach later, run: tmux attach -t jandy
 ```
 
-5. **Start on Boot (Optional)**:
+6. **Start on Boot (Optional)**:
 To have the controller start automatically when your machine reboots, you can add a cron job. 
 
 Run `crontab -e` and add **one** of the following lines to the bottom of the file. Be sure to replace `/path/to/jandy-controller` with the actual path to your repository.
