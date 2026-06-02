@@ -150,8 +150,8 @@ class JandyController:
                 
                 self._handle_packet(packet)
             
-            # Check for delayed ACK (35ms delay)
-            if self.pending_ack and (time.time() - self.pending_ack_time >= 0.035):
+            # Check for delayed ACK (25ms delay to let physical remote answer first)
+            if getattr(self, 'pending_ack', False) and (time.time() - self.pending_ack_time >= 0.025):
                 self.pending_ack = False
                 
                 # Construct ACK
