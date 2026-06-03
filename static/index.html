@@ -26,9 +26,12 @@
                 <button class="btn-icon" style="width: 30px; height: 30px; font-size: 14px;"
                     onclick="toggleFullScreen()" title="Toggle Fullscreen">⛶</button>
             </div>
-            <div class="status-indicator">
-                <span class="dot"></span>
-                <span id="connection-status">Connected</span>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                <div class="status-indicator">
+                    <span class="dot"></span>
+                    <span id="connection-status">Connected</span>
+                </div>
+                <div id="cpu-temp" style="font-size: 10px; color: #94a3b8; font-weight: 600;">CPU: --°C</div>
             </div>
         </header>
 

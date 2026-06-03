@@ -13,6 +13,7 @@ let modalTemp = 85;
 // Elements
 const airTempEl = document.getElementById('air-temp');
 const waterTempEl = document.getElementById('water-temp');
+const cpuTempEl = document.getElementById('cpu-temp');
 const controlGrid = document.getElementById('control-grid');
 const connectionStatus = document.getElementById('connection-status');
 const statusDot = document.querySelector('.dot');
@@ -81,6 +82,10 @@ async function pollStatus() {
         // Update Temps
         airTempEl.textContent = status.air_temp ? `${status.air_temp}°` : '--°';
         waterTempEl.textContent = status.water_temp ? `${status.water_temp}°` : '--°';
+
+        if (cpuTempEl && data.cpu_temp !== undefined && data.cpu_temp !== null) {
+            cpuTempEl.textContent = `CPU: ${data.cpu_temp}°C`;
+        }
 
         // Update Button States
         updateButtonState('pool_mode', status.pool_mode_on);

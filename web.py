@@ -122,13 +122,26 @@ class CommandRequest(BaseModel):
     state: bool = False
     temp: int = None
 
+cpu_temp_history = deque(maxlen=10)
+
+def get_cpu_temp():
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+            temp = int(f.read().strip()) / 1000.0
+            cpu_temp_history.append(temp)
+            avg_temp = sum(cpu_temp_history) / len(cpu_temp_history)
+            return int(round(avg_temp))
+    except Exception:
+        return None
+
 @app.get("/api/status")
 def get_status():
     """Returns the instant snapshot of the equipment state and hardware configuration."""
     return {
         "status": api.get_status(),
         "config": api.config,
-        "logs": list(log_catcher.logs)
+        "logs": list(log_catcher.logs),
+        "cpu_temp": get_cpu_temp()
     }
 
 @app.post("/api/command")
