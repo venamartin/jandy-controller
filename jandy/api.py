@@ -405,7 +405,7 @@ class JandyController:
             print(f"[API] SAFETY LOCKOUT: {equip_name.strip()} is in a transitional state (***). Aborting.")
             return False
             
-        is_on = " ON" in current_text
+        is_on = " ON" in current_text or " ENA" in current_text
         
         if is_on == desired_state:
             print(f"[API] {equip_name.strip()} is already {'ON' if is_on else 'OFF'}.")
@@ -436,7 +436,7 @@ class JandyController:
             self.press("BACK")
             return False
             
-        is_on = " ON" in current_text
+        is_on = " ON" in current_text or " ENA" in current_text
         
         # Sync current known state just in case it was missed by the scraper
         if equip_name == "AIR BLOWER": self.status["blower_on"] = is_on
